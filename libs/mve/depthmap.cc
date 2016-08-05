@@ -514,7 +514,7 @@ rangegrid_triangulate (Image<unsigned int> const& grid, TriangleMesh::Ptr mesh)
 /* ---------------------------------------------------------------- */
 
 void
-depthmap_mesh_confidences (TriangleMesh::Ptr mesh, int clampIters, int iterations)
+depthmap_mesh_confidences (TriangleMesh::Ptr mesh, int toZeroIters, int iterations)
 {
     if (mesh == nullptr)
         throw std::invalid_argument("Null mesh given");
@@ -525,6 +525,9 @@ depthmap_mesh_confidences (TriangleMesh::Ptr mesh, int clampIters, int iteration
     if (iterations == 0)
         return;
 
+	/* Idea: MVS patch matching of "Multi-View Stereo for Community Photo Collections", [Goesele et al.], 2007 constantly overestimates surfaces.
+	   (There are almost always samples outside a true object surface / depthmaps are simply too large.)
+	   For this reason, confidence values of known but outside depthmap results at borders between knwon and unkown depthmap space are downweighted or discarded. */
     TriangleMesh::ConfidenceList& confs(mesh->get_vertex_confidences());
     TriangleMesh::VertexList const& verts(mesh->get_vertices());
     confs.clear();
@@ -545,7 +548,7 @@ depthmap_mesh_confidences (TriangleMesh::Ptr mesh, int clampIters, int iteration
     {
         /* Calculate confidence for that iteration. */
         float conf = 0.0f;
-        if (current > clampIters)
+		if (current > toZeroIters)
         {
              conf = (float)current / (float)iterations;
         }
