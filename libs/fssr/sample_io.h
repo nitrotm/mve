@@ -75,6 +75,7 @@ private:
 
     void ply_read (float* value);
     void ply_read (uint8_t* value);
+	void ply_read (uint32_t* value);
     void ply_read_convert (float* value);
     bool next_sample_intern (Sample* sample);
     void reset_stream_state (void);
