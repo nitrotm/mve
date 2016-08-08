@@ -514,15 +514,18 @@ rangegrid_triangulate (Image<unsigned int> const& grid, TriangleMesh::Ptr mesh)
 /* ---------------------------------------------------------------- */
 
 void
-depthmap_mesh_confidences (TriangleMesh::Ptr mesh, int toZeroIters, int iterations)
+depthmap_mesh_confidences (TriangleMesh::Ptr mesh, int numZeroRings, int numRings)
 {
     if (mesh == nullptr)
         throw std::invalid_argument("Null mesh given");
 
-    if (iterations < 0)
-        throw std::invalid_argument("Invalid amount of iterations");
+	if (numRings < 0)
+		throw std::invalid_argument("Invalid number of border vertex confidence downscaling iterations.");
 
-    if (iterations == 0)
+	if (numRings < numZeroRings)
+		throw std::invalid_argument("Invalid number of border vertex zero confidence iterations.");
+
+	if (numRings == 0)
         return;
 
 	/* Idea: MVS patch matching of "Multi-View Stereo for Community Photo Collections", [Goesele et al.], 2007 constantly overestimates surfaces.
@@ -544,13 +547,15 @@ depthmap_mesh_confidences (TriangleMesh::Ptr mesh, int toZeroIters, int iteratio
     }
 
     /* Iteratively expand the current region and update confidences. */
-    for (int current = 0; current < iterations; ++current)
+	const int startOffset = -numZeroRings + 1;
+	const float rampSize = numRings + startOffset;
+	for (int current = 0; current < numRings; ++current)
     {
         /* Calculate confidence for that iteration. */
         float conf = 0.0f;
-		if (current > toZeroIters)
+		if (current >= numZeroRings)
         {
-             conf = (float)current / (float)iterations;
+			conf = (float)(current + startOffset) / rampSize;
         }
         //conf = math::algo::fastpow(conf, 3);
 

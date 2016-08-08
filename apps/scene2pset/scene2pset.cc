@@ -43,10 +43,11 @@ struct AppSettings
     float min_valid_fraction = 0.0f;
 	float scale_factor = 2.5f; /* "Radius" of MVS patch (usually 5x5). */
 
-	// Set confidence values to zero (up to 'confToZeroIters' iterations)
-    // and then linear (up to 'confDownweightingIters')
-	std::size_t confToZeroIters = 0;
-    std::size_t confDownweightingIters = 4;
+	// Set confidence values to zero (up to 'confNumZeroRings' iterations), e.g. confNumZeroRings = 1 -> border vertices are assigned a confidence value of zero
+	// and then gradually increase vertex confidence values so that a vertex with border distance confNumDownweightingRings has a confidence of 1
+	// -> confNumDownweightingRings rings are downweighted
+	std::size_t confNumZeroRings = 2;
+	std::size_t confNumDownweightingRings = 4;
 
 	bool with_conf = false;
 	bool with_normals = false;
@@ -117,7 +118,8 @@ main (int argc, char** argv)
     args.add_option('p', "poisson-normals", false, "Scale normals according to confidence");
     args.add_option('S', "scale-factor", true, "Factor for computing scale values [2.5]");
 	args.add_option('F', "fssr", true, "FSSR output, sets -nsc and -di with scale ARG");
-	args.add_option('w', "conf-weighting-iters", true, "Decrease confidences per depthmap at border. (v \\in border distance [0,b] -> conf=0; rings a to b -> confs linearly increase). [a,b]=[0,4]");
+	args.add_option('w', "border-conf-weighting", true, "Decrease confidences per depthmap at border. (a -> number of rings with zero confidence, b -> number of downscaled confidence rings. [a,b]=[2,4] \n"
+	"Default:[a=2,b=4] c(0)=0, c(1)=0, c(2)=1/3, c(3)=2/3, c(4)=3/3=1 == border vertices and their neighbors get zero confidence, 4 border rings are less confident.");
     args.parse(argc, argv);
 
     /* Init default settings. */
@@ -162,8 +164,8 @@ main (int argc, char** argv)
             {
                 util::Tokenizer tk;
                 tk.split(arg->get_arg<std::string>(), ',');
-				conf.confToZeroIters = util::string::convert<std::size_t>(tk[0]);
-                conf.confDownweightingIters = util::string::convert<std::size_t>(tk[1]);
+				conf.confNumZeroRings = util::string::convert<std::size_t>(tk[0]);
+				conf.confNumDownweightingRings = util::string::convert<std::size_t>(tk[1]);
                 break;
             }
 
@@ -282,7 +284,7 @@ main (int argc, char** argv)
         if (conf.with_conf)
         {
             /* Per-vertex confidence down-weighting boundaries. */
-			mve::geom::depthmap_mesh_confidences(mesh, conf.confToZeroIters, conf.confDownweightingIters);
+			mve::geom::depthmap_mesh_confidences(mesh, conf.confNumZeroRings, conf.confNumDownweightingRings);
 
 #if 0
             /* Per-vertex confidence based on normal-viewdir dot product. */
