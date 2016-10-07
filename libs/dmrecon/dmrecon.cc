@@ -76,7 +76,7 @@ DMRecon::DMRecon(mve::Scene::Ptr _scene, Settings const& _settings)
 
     /* Prepare reconstruction */
 	refV->loadColorImage(settings.scale);
-	refV->prepareMasterView(settings.scale, settings.keepViewIndicesPerPixel, settings.nrReconNeighbors);
+	refV->prepareMasterView(settings.scale, settings.keepViewIndicesPerPixel, settings.nrReconNeighbors + 1);
     mve::ByteImage::ConstPtr scaled_img = refV->getScaledImg();
     this->width = scaled_img->width();
     this->height = scaled_img->height();
@@ -324,10 +324,11 @@ DMRecon::processFeatures()
             refV->confImg->at(index) = conf;
 			if (settings.keepViewIndicesPerPixel)
 			{
-				// store view indices of for this feature in an image at the feature pixel coordinates
+				// store view indices
 				IndexSet const& localViewIDs = patch.getLocalViewIDs();
-
-				std::size_t nextViewIDIndex = 0;
+				size_t nextViewIDIndex = 0;
+				
+				refV->viewIndicesImg->at(index, nextViewIDIndex++) = refV->getViewID();
 				for (IndexSet::iterator it = localViewIDs.begin(); it != localViewIDs.end(); ++it)
 					refV->viewIndicesImg->at(index, nextViewIDIndex++) = *it;
 			}
