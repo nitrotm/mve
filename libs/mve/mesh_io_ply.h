@@ -126,6 +126,7 @@ enum PLYVertexProperty
     PLY_V_DOUBLE_X,
     PLY_V_DOUBLE_Y,
     PLY_V_DOUBLE_Z,
+	PLY_V_DOUBLE_VALUE,
     PLY_V_FLOAT_NX,
     PLY_V_FLOAT_NY,
     PLY_V_FLOAT_NZ,

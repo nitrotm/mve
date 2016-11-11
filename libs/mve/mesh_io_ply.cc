@@ -285,6 +285,8 @@ load_ply_mesh (std::string const& filename)
                         v_format.push_back(PLY_V_DOUBLE_Y);
                     else if (header[2] == "z")
                         v_format.push_back(PLY_V_DOUBLE_Z);
+					else if (header[2] == "value")
+						v_format.push_back(PLY_V_DOUBLE_VALUE);
                     else
                         v_format.push_back(PLY_V_IGNORE_DOUBLE);
                 }
@@ -504,7 +506,11 @@ load_ply_mesh (std::string const& filename)
             case PLY_V_FLOAT_VALUE:
                 vvalues.push_back(ply_read_value<float>(input, ply_format));
                 break;
-
+				
+			case PLY_V_DOUBLE_VALUE:
+				vvalues.push_back(ply_read_value<double>(input, ply_format));
+				break;
+					
             case PLY_V_IGNORE_FLOAT:
                 ply_read_value<float>(input, ply_format);
                 break;
