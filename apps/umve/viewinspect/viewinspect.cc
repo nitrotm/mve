@@ -258,7 +258,7 @@ ViewInspect::load_image_file (QString filename)
     std::string fname = filename.toStdString();
     std::string ext4 = util::string::right(fname, 4);
     std::string ext5 = util::string::right(fname, 5);
-
+	
     /* Try to load it as byte image. */
     mve::ImageBase::Ptr img;
     try
@@ -277,6 +277,12 @@ ViewInspect::load_image_file (QString filename)
         catch (...) {}
     }
 
+    if (img == nullptr && (ext5 == ".mvei"))
+    {
+	    try { img = mve::image::load_mvei_file(fname); }
+        catch (...) {}
+    }
+	
     if (img == nullptr)
     {
         QMessageBox::warning(this, tr("Image Viewer"),
