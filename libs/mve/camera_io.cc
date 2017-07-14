@@ -30,22 +30,30 @@ save_camera_infos (const std::vector<View::Ptr> &views, std::string const& file_
 	std::ofstream out(file_name.c_str(), std::ios::binary);
 	if (!out.good())
 		throw util::FileException(file_name, std::strerror(errno));
+	
+	size_t actual_view_count = 0;
+	for (size_t view_idx = 0; view_idx < view_count; ++view_idx)
+		if (nullptr != views[view_idx])
+			++actual_view_count;
 
 	out << "MVE camera infos 1.0\n";
-	out << "camera_count = " << view_count << "\n";
+	out << "camera_count = " << actual_view_count << "\n";
 
 	/* Write all cameras infos to file. */
-	for (size_t viewIdx = 0; viewIdx < view_count; ++viewIdx)
+	for (size_t view_idx = 0; view_idx < view_count; ++view_idx)
 	{
-		if (nullptr == views[viewIdx])
+		if (nullptr == views[view_idx])
 			continue;
 
-		View const& view = *(views[viewIdx]);
+		View const& view = *(views[view_idx]);
 		CameraInfo const& cam = view.get_camera();
-
+		std::string name = view.get_name();
+		if (name.empty())
+			name = std::to_string(view.get_id());
+		
 		/* identifiers */
 		out << "id = " << view.get_id() << "\n";
-		out << "name = " << view.get_name() << "\n";
+		out << "name = " << name << "\n";
 
 		/* intrinsics */
 		out << "focal_length = " << cam.flen << "\n";
