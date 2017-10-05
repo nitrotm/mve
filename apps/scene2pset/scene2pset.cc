@@ -205,8 +205,7 @@ main (int argc, char** argv)
 	mve::TriangleMesh::VertexViewLists& vviews(pset->get_vertex_view_lists());
 
     /* Load scene. */
-    mve::Scene::Ptr scene(mve::Scene::create());
-    scene->load_scene(conf.scenedir);
+    mve::Scene::Ptr scene = mve::Scene::create(conf.scenedir);
 
     /* Iterate over views and get points. */
     mve::Scene::ViewList& views(scene->get_views());
@@ -220,6 +219,10 @@ main (int argc, char** argv)
         std::size_t view_id = view->get_id();
         if (!conf.ids.empty() && std::find(conf.ids.begin(),
             conf.ids.end(), view_id) == conf.ids.end())
+            continue;
+
+        mve::CameraInfo const& cam = view->get_camera();
+        if (cam.flen == 0.0f)
             continue;
 
         mve::FloatImage::Ptr dm = view->get_float_image(conf.dmname);
@@ -268,7 +271,6 @@ main (int argc, char** argv)
             << "..." << std::endl;
 
         /* Triangulate depth map. */
-        mve::CameraInfo const& cam = view->get_camera();
         mve::TriangleMesh::Ptr mesh;
 		mesh = mve::geom::depthmap_triangulate(dm, ci, cam, vi);
         mve::TriangleMesh::VertexList const& mverts(mesh->get_vertices());

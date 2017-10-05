@@ -132,9 +132,7 @@ load_8bit_image (std::string const& fname, std::string* exif)
             return mve::image::load_file(fname);
     }
     catch (...)
-    {
-        throw;
-    }
+    { }
 
     return mve::ByteImage::Ptr();
 }
@@ -424,20 +422,8 @@ namespace
 }
 
 void
-import_bundle (AppSettings const& conf)
+import_bundle_noah_ps (AppSettings const& conf)
 {
-    /**
-     * Try to detect VisualSFM bundle format.
-     * In this case the input is a file with extension ".nvm".
-     */
-    if (util::string::right(conf.input_path, 4) == ".nvm"
-        && util::fs::file_exists(conf.input_path.c_str()))
-    {
-        std::cout << "Info: Detected VisualSFM bundle format." << std::endl;
-        import_bundle_nvm(conf);
-        return;
-    }
-
     /* Build some paths. */
     std::string bundle_fname;
     std::string imglist_file;
@@ -459,10 +445,7 @@ import_bundle (AppSettings const& conf)
         undist_path = util::fs::join_path(conf.input_path, PS_UNDIST_DIR);
 
         if (util::fs::file_exists(bundle_fname.c_str()))
-        {
-            std::cout << "Info: Detected Photosynther format." << std::endl;
             bundler_fmt = BUNDLE_FORMAT_PHOTOSYNTHER;
-        }
     }
 
     /*
@@ -483,10 +466,7 @@ import_bundle (AppSettings const& conf)
         image_path = util::fs::join_path(conf.input_path, BUNDLER_IMAGE_DIR);
 
         if (util::fs::file_exists(bundle_fname.c_str()))
-        {
-            std::cout << "Info: Detected Noah's Bundler format." << std::endl;
             bundler_fmt = BUNDLE_FORMAT_NOAH_BUNDLER;
-        }
     }
 
     /* Read bundle file. */
@@ -534,7 +514,7 @@ import_bundle (AppSettings const& conf)
         }
         if (orig_files.size() != bundle->get_num_cameras())
         {
-            std::cerr << "Error: Invalid amount of original images." << std::endl;
+            std::cerr << "Error: False amount of original images." << std::endl;
             std::exit(EXIT_FAILURE);
         }
         std::cout << "Recognized " << orig_files.size()
@@ -635,13 +615,10 @@ import_bundle (AppSettings const& conf)
             /* For Noah datasets, load original image and undistort it. */
             std::string orig_fname
                 = util::fs::join_path(image_path, orig_files[i]);
-            try
+            original = load_8bit_image(orig_fname, &exif);
+            if (original == nullptr)
             {
-                original = load_8bit_image(orig_fname, &exif);
-            }
-            catch (util::Exception &e)
-            {
-                std::cerr << orig_fname << ": " << e.what() << std::endl;
+                std::cerr << "Error loading: " << orig_fname << std::endl;
                 std::exit(EXIT_FAILURE);
             }
             thumb = create_thumbnail(original);
@@ -651,7 +628,7 @@ import_bundle (AppSettings const& conf)
             view->set_camera(cam);
 
             if (cam.flen != 0.0f)
-                undist = mve::image::image_undistort_bundler<uint8_t>
+                undist = mve::image::image_undistort_k2k4<uint8_t>
                     (original, cam.flen, cam.dist[0], cam.dist[1]);
 
             if (!import_original)
@@ -739,6 +716,66 @@ import_bundle (AppSettings const& conf)
         << num_valid_cams << " valid cameras." << std::endl;
     std::cout << "Imported " << undist_imported
         << " undistorted images." << std::endl;
+}
+
+/* ---------------------------------------------------------------- */
+
+bool
+is_visual_sfm_bundle_format (AppSettings const& conf)
+{
+    return util::string::right(conf.input_path, 4) == ".nvm"
+        && util::fs::file_exists(conf.input_path.c_str());
+}
+
+bool
+is_photosynther_bundle_format (AppSettings const& conf)
+{
+    std::string bundle_fname = util::fs::join_path(conf.bundle_path,
+        "synth_" + util::string::get(conf.bundle_id) + ".out");
+    return util::fs::file_exists(bundle_fname.c_str());
+}
+
+bool
+is_noah_bundler_format (AppSettings const& conf)
+{
+    std::string bundle_fname = util::fs::join_path(conf.bundle_path,
+        conf.bundle_id == 0 ? "bundle.out" : "bundle_"
+        + util::string::get_filled(conf.bundle_id, 3, '0') + ".out");
+    return util::fs::file_exists(bundle_fname.c_str());
+}
+
+/* ---------------------------------------------------------------- */
+
+void
+import_bundle (AppSettings const& conf)
+{
+    /**
+     * Try to detect VisualSFM bundle format.
+     * In this case the input is a file with extension ".nvm".
+     */
+    if (is_visual_sfm_bundle_format(conf))
+    {
+        std::cout << "Info: Detected VisualSFM bundle format." << std::endl;
+        import_bundle_nvm(conf);
+        return;
+    }
+
+    /**
+     * Try to detect Noah bundler or Photosynther. These bundle formats
+     * are similar and handled with the same import function.
+     */
+    if (is_photosynther_bundle_format(conf))
+    {
+        std::cout << "Info: Detected Photosynther bundle format." << std::endl;
+        import_bundle_noah_ps(conf);
+        return;
+    }
+    if (is_noah_bundler_format(conf))
+    {
+        std::cout << "Info: Detected Noah bundler format." << std::endl;
+        import_bundle_noah_ps(conf);
+        return;
+    }
 }
 
 /* ---------------------------------------------------------------- */

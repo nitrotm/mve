@@ -13,6 +13,7 @@
 #include <iostream>
 #include <limits>
 #include <complex>
+#include <type_traits>
 
 #include "util/exception.h"
 #include "math/accum.h"
@@ -117,14 +118,15 @@ image_undistort_msps (typename Image<T>::ConstPtr img, double k0, double k1);
 
 /**
  * Undistorts the input image given the focal length of the image and
- * two undistortion parameters. If both distortion parameters are 0, the
- * undistortion has no effect. The focal length is expected to be in
- * unit format. This distortion model is used by the Noah bundler.
+ * two undistortion parameters. The distortion model is computed as:
+ * rd(r) = 1 + k_2 r^2 + k_4 r^4  with  r^2 = x^2 + y^2. The focal length
+ * is expected to be in unit format. This distortion model is used by MVE
+ * and Noah's bundler.
  */
 template <typename T>
 typename Image<T>::Ptr
-image_undistort_bundler (typename Image<T>::ConstPtr img,
-    double focal_length, double k0, double k1);
+image_undistort_k2k4 (typename Image<T>::ConstPtr img,
+    double focal_length, double k2, double k4);
 
 /**
  * Undistorts the input image given the focal length of the image and
@@ -415,13 +417,12 @@ gamma_correct (ByteImage::Ptr image, float power);
 
 /**
  * Applies gamma correction to float/double images (in-place) with linear
- * RGB values in range [0, 1] to nonlinear R'G'B' values according to the
- * sRGB standard at http://www.w3.org/Graphics/Color/sRGB:
+ * RGB values in range [0, 1] to nonlinear R'G'B' values according to
+ * http://www.brucelindbloom.com/index.html?Eqn_XYZ_to_RGB.html:
  *
- *   X' = 12.92 * X                   if X <= 0.00304
+ *   X' = 12.92 * X                   if X <= 0.0031308
  *   X' = 1.055 * X^(1/2.4) - 0.055   otherwise
  *
- * Warning: This only works correctly with float or double images.
  * TODO: Implement overloading for integer image types.
  */
 template <typename T>
@@ -431,12 +432,11 @@ gamma_correct_srgb (typename Image<T>::Ptr image);
 /**
  * Applies inverse gamma correction to float/double (in-place) images with
  * nonlinear R'G'B' values in the range [0, 1] to linear sRGB values according
- * to the sRGB standard at http://www.w3.org/Graphics/Color/sRGB
+ * to http://www.brucelindbloom.com/index.html?Eqn_RGB_to_XYZ.html:
  *
- *   X = X' / 12.92                     if X' <= 0.03928
+ *   X = X' / 12.92                     if X' <= 0.04045
  *   X = ((X' + 0.055) / (1.055))^2.4   otherwise
  *
- * Warning: This only works correctly with float or double images.
  * TODO: Implement overloading for integer image types.
  */
 template <typename T>
@@ -1548,10 +1548,12 @@ template <typename T>
 void
 gamma_correct_srgb (typename Image<T>::Ptr image)
 {
+    static_assert(std::is_floating_point<T>::value,
+        "Only implemented for floating point images");
     int const num_values = image->get_value_amount();
     for (int i = 0; i < num_values; i++)
     {
-        if (image->at(i) <= T(0.00304))
+        if (image->at(i) <= T(0.0031308))
             image->at(i) *= T(12.92);
         else
         {
@@ -1567,10 +1569,12 @@ template <typename T>
 void
 gamma_correct_inv_srgb (typename Image<T>::Ptr image)
 {
+    static_assert(std::is_floating_point<T>::value,
+        "Only implemented for floating point images");
     int const num_values = image->get_value_amount();
     for (int i = 0; i < num_values; i++)
     {
-        if (image->at(i) <= T(0.03928))
+        if (image->at(i) <= T(0.04045))
             image->at(i) /= T(12.92);
         else
         {
@@ -1720,41 +1724,39 @@ image_undistort_msps (typename Image<T>::ConstPtr img, double k0, double k1)
 
 template <typename T>
 typename Image<T>::Ptr
-image_undistort_bundler (typename Image<T>::ConstPtr img,
-    double focal_length, double k0, double k1)
+image_undistort_k2k4 (typename Image<T>::ConstPtr img,
+    double focal_length, double k2, double k4)
 {
     if (img == nullptr)
         throw std::invalid_argument("Null image given");
 
-    if (k0 == 0.0 && k1 == 0.0)
+    if (k2 == 0.0 && k4 == 0.0)
         return img->duplicate();
 
     int const width = img->width();
     int const height = img->height();
     int const chans = img->channels();
-
-    double const width_half = static_cast<double>(width) / 2.0;
-    double const height_half = static_cast<double>(height) / 2.0;
-    double const noah_flen = focal_length * std::max(width, height);
-    double const f2inv = 1.0f / (noah_flen * noah_flen);
-
     typename Image<T>::Ptr out = Image<T>::create(width, height, chans);
     out->fill(T(0));
     T* out_ptr = out->get_data_pointer();
 
+    double const fwidth2 = static_cast<double>(width) / 2.0;
+    double const fheight2 = static_cast<double>(height) / 2.0;
+    double const fnorm = static_cast<double>(std::max(width, height));
     for (int y = 0; y < height; ++y)
         for (int x = 0; x < width; ++x, out_ptr += chans)
         {
-            double fx = static_cast<double>(x) - width_half;
-            double fy = static_cast<double>(y) - height_half;
-            double const r2 = (fx * fx + fy * fy) * f2inv;
-            double const factor = 1.0f + k0 * r2 + k1 * r2 * r2;
-            fx = fx * factor + width_half;
-            fy = fy * factor + height_half;
-
-            if (fx < -0.5 || fx > width - 0.5 || fy < -0.5 || fy > height - 0.5)
+            double const fx = (static_cast<double>(x) + 0.5 - fwidth2) / fnorm;
+            double const fy = (static_cast<double>(y) + 0.5 - fheight2) / fnorm;
+            double const rd = (fx * fx + fy * fy) / MATH_POW2(focal_length);
+            double const rd_factor = 1.0 + k2 * rd + k4 * rd * rd;
+            double const dist_x = fx * rd_factor;
+            double const dist_y = fy * rd_factor;
+            float const ix = dist_x * fnorm + fwidth2 - 0.5;
+            float const iy = dist_y * fnorm + fheight2 - 0.5;
+            if (ix < -0.5 || ix > width - 0.5 || iy < -0.5 || iy > height - 0.5)
                 continue;
-            img->linear_at(fx, fy, out_ptr);
+            img->linear_at(ix, iy, out_ptr);
         }
 
     return out;
