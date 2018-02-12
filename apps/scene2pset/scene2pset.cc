@@ -26,7 +26,7 @@
 #include "mve/mesh_io.h"
 #include "mve/mesh_io_ply.h"
 #include "mve/mesh_tools.h"
-#include "util/string.h"
+#include "util/strings.h"
 #include "mve/scene.h"
 #include "mve/view.h"
 
