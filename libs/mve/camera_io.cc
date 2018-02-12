@@ -14,7 +14,7 @@
 #include <fstream>
 #include "mve/camera_io.h"
 #include "util/file_system.h"
-#include "util/string.h"
+#include "util/strings.h"
 #include "util/exception.h"
 
 MVE_NAMESPACE_BEGIN
