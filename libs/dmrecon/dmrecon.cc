@@ -323,16 +323,7 @@ DMRecon::processFeatures()
             refV->dzImg->at(index, 1) = patch.getDzJ();
             refV->confImg->at(index) = conf;
 			if (settings.keepViewIndicesPerPixel)
-			{
-				// store view indices: reference view id & other local view ids
-				IndexSet const& localViewIDs = patch.getLocalViewIDs();
-				
-				refV->viewIndicesImg->at(index, 0) = getRefViewNr();
-				
-				size_t nextViewIDIndex = 1;
-				for (IndexSet::iterator it = localViewIDs.begin(); it != localViewIDs.end(); ++it)
-					refV->viewIndicesImg->at(index, nextViewIDIndex++) = *it;
-			}
+				storeViewIndices(refV, index, patch);
 
             QueueData tmpData;
             tmpData.confidence = conf;
@@ -419,14 +410,7 @@ DMRecon::processQueue()
             refV->dzImg->at(index, 1) = tmpData.dz_j;
             refV->confImg->at(index) = tmpData.confidence;
 			if (settings.keepViewIndicesPerPixel)
-			{
-				// store view indices of for this feature in an image at the feature pixel coordinates
-				IndexSet const& localViewIDs = patch.getLocalViewIDs();
-
-				std::size_t nextViewIDIndex = 0;
-				for (IndexSet::iterator it = localViewIDs.begin(); it != localViewIDs.end(); ++it)
-					refV->viewIndicesImg->at(index, nextViewIDIndex++) = *it;
-			}
+				storeViewIndices(refV, index, patch);
 
             // left
             tmpData.x = x - 1; tmpData.y = y;
@@ -462,6 +446,19 @@ DMRecon::processQueue()
             }
         }
     }
+}
+
+void
+DMRecon::storeViewIndices(const SingleView::Ptr &refV, const int &index, const PatchOptimization &patch)
+{
+	// store store reference view ID
+	refV->viewIndicesImg->at(index, 0) = getRefViewNr();
+	
+	// store other view IDs from local selection
+	IndexSet const& localViewIDs = patch.getLocalViewIDs();
+	size_t nextViewIDIndex = 1;
+	for (IndexSet::iterator it = localViewIDs.begin(); it != localViewIDs.end(); ++it)
+		refV->viewIndicesImg->at(index, nextViewIDIndex++) = *it;
 }
 
 MVS_NAMESPACE_END
