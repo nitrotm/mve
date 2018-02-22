@@ -36,7 +36,7 @@ save_camera_infos (const std::vector<View::Ptr> &views, std::string const& file_
 		if (nullptr != views[view_idx])
 			++actual_view_count;
 
-	out << "MVE camera infos 1.1\n";
+	out << "MVE camera infos 1.2\n";
 	out << "camera_count = " << actual_view_count << "\n";
 	out << "\n";
 	
@@ -46,18 +46,26 @@ save_camera_infos (const std::vector<View::Ptr> &views, std::string const& file_
 		if (nullptr == views[view_idx])
 			continue;
 
-		View const& view = *(views[view_idx]);
+		/* get view & camera & name*/
+		View &view = *(views[view_idx]);
 		CameraInfo const& cam = view.get_camera();
 		std::string name = view.get_name();
 		if (name.empty())
 			name = std::to_string(view.get_id());
 
+		/* get undistorted image resolution for image apsect ratio */
+		float image_aspect = 1.0f;
+		View::ImageProxy const* proxy = view.get_image_proxy("undistorted");
+		if (proxy)
+			image_aspect = (float) proxy->width / (float) proxy->height;
+			
 		/* intrinsics */
 		out << "focal_length = " << cam.flen << "\n";
+		out << "image_aspect = " << image_aspect << "\n";
 		out << "pixel_aspect = " << cam.paspect << "\n";
 		out << "principal_point = " << cam.ppoint[0] << " " << cam.ppoint[1] << "\n";
 		out << "camera_distortion = " << cam.dist[0] << " " << cam.dist[1] << "\n";
-
+		
 		/* extrinsics */
 		out << "rotation = ";
 		out	<< cam.rot[0] << " " << cam.rot[1] << " " << cam.rot[2] << " ";

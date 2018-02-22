@@ -324,11 +324,12 @@ DMRecon::processFeatures()
             refV->confImg->at(index) = conf;
 			if (settings.keepViewIndicesPerPixel)
 			{
-				// store view indices
+				// store view indices: reference view id & other local view ids
 				IndexSet const& localViewIDs = patch.getLocalViewIDs();
-				size_t nextViewIDIndex = 0;
 				
-				refV->viewIndicesImg->at(index, nextViewIDIndex++) = refV->getViewID();
+				refV->viewIndicesImg->at(index, 0) = getRefViewNr();
+				
+				size_t nextViewIDIndex = 1;
 				for (IndexSet::iterator it = localViewIDs.begin(); it != localViewIDs.end(); ++it)
 					refV->viewIndicesImg->at(index, nextViewIDIndex++) = *it;
 			}
