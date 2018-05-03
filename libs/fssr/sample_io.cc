@@ -333,12 +333,12 @@ SampleIO::next_sample_intern (Sample* sample)
                 this->ply_read(&dummy);
                 break;
             }
-			case mve::geom::PLY_V_IGNORE_UINT32:
-			{
-				uint32_t dummy;
-				this->ply_read(&dummy);
-				break;
-			}
+            case mve::geom::PLY_V_IGNORE_UINT32:
+            {
+                uint32_t dummy;
+                this->ply_read(&dummy);
+                break;
+            }
             default:
                 this->reset_stream_state();
                 throw std::runtime_error("Invalid sample attribute");
@@ -369,12 +369,11 @@ SampleIO::ply_read (uint8_t* value)
         (this->stream.stream, this->stream.format);
 }
 
-
 void
 SampleIO::ply_read (uint32_t* value)
 {
-	*value = mve::geom::ply_read_value<uint32_t>
-		(this->stream.stream, this->stream.format);
+    *value = mve::geom::ply_read_value<uint32_t>
+        (this->stream.stream, this->stream.format);
 }
 
 void

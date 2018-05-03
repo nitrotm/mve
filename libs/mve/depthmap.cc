@@ -318,9 +318,11 @@ depthmap_triangulate (FloatImage::ConstPtr dm, math::Matrix3f const& invproj,
 }
 
 /* ---------------------------------------------------------------- */
+
 TriangleMesh::Ptr
-depthmap_triangulate(FloatImage::ConstPtr dm, ByteImage::ConstPtr ci,
-	math::Matrix3f const& invproj, IntImage::ConstPtr vi, float dd_factor)
+depthmap_triangulate (FloatImage::ConstPtr dm, ByteImage::ConstPtr ci, IntImage::ConstPtr vi,
+    math::Matrix3f const& invproj, float dd_factor,
+    mve::Image<unsigned int>* vertex_ids)
 {
     if (dm == nullptr)
         throw std::invalid_argument("Null depthmap given");
@@ -331,63 +333,59 @@ depthmap_triangulate(FloatImage::ConstPtr dm, ByteImage::ConstPtr ci,
     if (ci != nullptr && (ci->width() != width || ci->height() != height))
         throw std::invalid_argument("Color image dimension mismatch");
 
-	if (vi != nullptr && (vi->width() != width || vi->height() != height))
-		throw std::invalid_argument("View ID image dimension mismatch");
+    if (vi != nullptr && (vi->width() != width || vi->height() != height))
+        throw std::invalid_argument("View ID image dimension mismatch");
 
     /* Triangulate depth map. */
-	mve::Image<unsigned int> vids;
+    mve::Image<unsigned int> vids;
     mve::TriangleMesh::Ptr mesh;
-	mesh = mve::geom::depthmap_triangulate(dm, invproj, dd_factor, &vids);
+    mesh = mve::geom::depthmap_triangulate(dm, invproj, dd_factor, &vids);
 
-	/* If provided, add other data to the mesh, such as visibility information, colors. */
-	mve::TriangleMesh::VertexList const& verts(mesh->get_vertices());
-	int const num_pixel = vids.get_pixel_amount();
-
-	/* Add per vertex view sets? */
-	if (vi != nullptr)
-	{
-		mve::TriangleMesh::VertexViewLists& view_lists(mesh->get_vertex_view_lists());
-		view_lists.resize(verts.size());
-
-		/* Use vertex index mapping to set view indices for each vertex. */
-		std::size_t const channel_count = vi->channels();
-		for (int i = 0; i < num_pixel; ++i)
-		{
-			unsigned int const vertex_index = vids[i];
-			if (vertex_index == MATH_MAX_UINT)
-				continue;
-
-			view_lists[vertex_index].resize(channel_count);
-			for (std::size_t channel = 0; channel < channel_count; ++channel)
-				view_lists[vertex_index][channel] = vi->at(i, channel);
-		}
-	}
-
-	/* Add vertex colors? */
-	if (ci == nullptr)
+    if (ci == nullptr && vi == nullptr)
         return mesh;
 
-	/* Use vertex index mapping to color the mesh. */
-	mve::TriangleMesh::ColorList& colors(mesh->get_vertex_colors());
-    colors.resize(verts.size());
+    /* Use vertex index mapping to color the mesh. */
+    /* and add per vertex view sets if requested */
+    mve::TriangleMesh::ColorList& colors(mesh->get_vertex_colors());
+    mve::TriangleMesh::VertexViewLists& view_lists(mesh->get_vertex_view_lists());
+    mve::TriangleMesh::VertexList const& verts(mesh->get_vertices());
+    if (ci != nullptr)
+        colors.resize(verts.size());
+    if (vi != nullptr)
+        view_lists.resize(verts.size());
 
-	for (int i = 0; i < num_pixel; ++i)
-	{
-		if (vids[i] == MATH_MAX_UINT)
-			continue;
+    int num_pixel = vids.get_pixel_amount();
+    int channel_count = vi != nullptr ? vi->channels() : 0;
+    for (int i = 0; i < num_pixel; ++i)
+    {
+        if (vids[i] == MATH_MAX_UINT)
+            continue;
 
-		math::Vec4f color(ci->at(i, 0), 0.0f, 0.0f, 255.0f);
-		if (ci->channels() >= 3)
-		{
-			color[1] = ci->at(i, 1);
-			color[2] = ci->at(i, 2);
-		}
-		else
-		{
-			color[1] = color[2] = color[0];
-		}
-		colors[vids[i]] = color / 255.0f;
-	}
+        if (ci != nullptr)
+        {
+            math::Vec4f color(ci->at(i, 0), 0.0f, 0.0f, 255.0f);
+            if (ci->channels() >= 3)
+            {
+                color[1] = ci->at(i, 1);
+                color[2] = ci->at(i, 2);
+            }
+            else
+            {
+                color[1] = color[2] = color[0];
+            }
+            colors[vids[i]] = color / 255.0f;
+        }
+        if (vi != nullptr)
+        {
+            view_lists[vids[i]].resize(channel_count);
+            for (std::size_t channel = 0; channel < channel_count; ++channel)
+                view_lists[vids[i]][channel] = vi->at(i, channel);
+        }
+    }
+
+    /* Provide the vertex ID mapping if requested. */
+    if (vertex_ids != nullptr)
+        std::swap(vids, *vertex_ids);
 
     return mesh;
 }
@@ -395,8 +393,9 @@ depthmap_triangulate(FloatImage::ConstPtr dm, ByteImage::ConstPtr ci,
 /* ---------------------------------------------------------------- */
 
 TriangleMesh::Ptr
-depthmap_triangulate (FloatImage::ConstPtr dm, ByteImage::ConstPtr ci,
-	CameraInfo const& cam, IntImage::ConstPtr vi, float dd_factor)
+depthmap_triangulate (FloatImage::ConstPtr dm, ByteImage::ConstPtr ci, IntImage::ConstPtr vi,
+    CameraInfo const& cam, float dd_factor,
+    mve::Image<unsigned int>* vertex_ids)
 {
     if (dm == nullptr)
         throw std::invalid_argument("Null depthmap given");
@@ -407,7 +406,7 @@ depthmap_triangulate (FloatImage::ConstPtr dm, ByteImage::ConstPtr ci,
     math::Matrix3f invproj;
     cam.fill_inverse_calibration(*invproj, dm->width(), dm->height());
     mve::TriangleMesh::Ptr mesh;
-	mesh = mve::geom::depthmap_triangulate(dm, ci, invproj, vi, dd_factor);
+    mesh = mve::geom::depthmap_triangulate(dm, ci, vi, invproj, dd_factor, vertex_ids);
 
     /* Transform mesh to world coordinates. */
     math::Matrix4f ctw;
@@ -514,23 +513,23 @@ rangegrid_triangulate (Image<unsigned int> const& grid, TriangleMesh::Ptr mesh)
 /* ---------------------------------------------------------------- */
 
 void
-depthmap_mesh_confidences (TriangleMesh::Ptr mesh, int numZeroRings, int numRings)
+depthmap_mesh_confidences (TriangleMesh::Ptr mesh, int iterations, int numZeroRings)
 {
     if (mesh == nullptr)
         throw std::invalid_argument("Null mesh given");
 
-	if (numRings < 0)
-		throw std::invalid_argument("Invalid number of border vertex confidence downscaling iterations.");
+    if (iterations < 0)
+        throw std::invalid_argument("Invalid amount of iterations");
 
-	if (numRings < numZeroRings)
-		throw std::invalid_argument("Invalid number of border vertex zero confidence iterations.");
-
-	if (numRings == 0)
+    if (iterations == 0)
         return;
 
-	/* Idea: MVS patch matching of "Multi-View Stereo for Community Photo Collections", [Goesele et al.], 2007 constantly overestimates surfaces.
-	   (There are almost always samples outside a true object surface / depthmaps are simply too large.)
-	   For this reason, confidence values of known but outside depthmap results at borders between knwon and unkown depthmap space are downweighted or discarded. */
+    /* Idea: MVS patch matching of "Multi-View Stereo for Community Photo Collections", [Goesele et al.], 2007 constantly overestimates surfaces.
+       (There are almost always samples outside a true object surface / depthmaps are simply too large.)
+       For this reason, confidence values of known but outside depthmap results at borders between knwon and unkown depthmap space are downweighted or discarded. */
+    if (iterations < numZeroRings)
+        throw std::invalid_argument("Invalid number of border vertex zero confidence iterations.");
+
     TriangleMesh::ConfidenceList& confs(mesh->get_vertex_confidences());
     TriangleMesh::VertexList const& verts(mesh->get_vertices());
     confs.clear();
@@ -547,16 +546,12 @@ depthmap_mesh_confidences (TriangleMesh::Ptr mesh, int numZeroRings, int numRing
     }
 
     /* Iteratively expand the current region and update confidences. */
-	const int startOffset = -numZeroRings + 1;
-	const float rampSize = numRings + startOffset;
-	for (int current = 0; current < numRings; ++current)
+    int startOffset = -numZeroRings + 1;
+    float rampSize = iterations + startOffset;
+    for (int current = 0; current < iterations; ++current)
     {
         /* Calculate confidence for that iteration. */
-        float conf = 0.0f;
-		if (current >= numZeroRings)
-        {
-			conf = (float)(current + startOffset) / rampSize;
-        }
+        float conf = current >= numZeroRings ? (float)(current + startOffset) / rampSize : 0.0f;
         //conf = math::algo::fastpow(conf, 3);
 
         /* Assign current confidence to all vertices. */

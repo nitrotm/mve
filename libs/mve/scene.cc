@@ -54,17 +54,15 @@ Scene::save_bundle (void)
 void
 Scene::save_views (void)
 {
-	std::string cameraFile = basedir + "/Cameras.txt";
-
-	std::cout << "Saving camera infos to camera MVE file..." << std::flush;
-		save_camera_infos(this->views, cameraFile);
-	std::cout << " done." << std::endl;
-
     std::cout << "Saving views to MVE files..." << std::flush;
     for (std::size_t i = 0; i < this->views.size(); ++i)
         if (this->views[i] != nullptr && this->views[i]->is_dirty())
             this->views[i]->save_view();
-	std::cout << " done." << std::endl;
+    std::cout << " done." << std::endl;
+
+    std::cout << "Saving cameras.txt to MVE files..." << std::flush;
+    save_camera_infos(this->views, basedir + "/cameras.txt");
+    std::cout << " done." << std::endl;
 }
 
 /* ---------------------------------------------------------------- */

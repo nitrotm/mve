@@ -54,11 +54,11 @@ struct SavePLYOptions
     bool write_vertex_normals = false;
     bool write_vertex_confidences = true;
     bool write_vertex_values = true;
-	bool write_vertex_view_ids = false;
+    bool write_vertex_view_ids = false;
     bool write_face_colors = true;
     bool write_face_normals = false;
     unsigned int verts_per_simplex = 3;
-	unsigned char view_ids_per_vertex = 4;
+    unsigned char view_ids_per_vertex = 4;
 };
 
 /**
@@ -126,7 +126,7 @@ enum PLYVertexProperty
     PLY_V_DOUBLE_X,
     PLY_V_DOUBLE_Y,
     PLY_V_DOUBLE_Z,
-	PLY_V_DOUBLE_VALUE,
+    PLY_V_DOUBLE_VALUE,
     PLY_V_FLOAT_NX,
     PLY_V_FLOAT_NY,
     PLY_V_FLOAT_NZ,
@@ -140,11 +140,11 @@ enum PLYVertexProperty
     PLY_V_FLOAT_V,
     PLY_V_FLOAT_CONF,
     PLY_V_FLOAT_VALUE,
-	PLY_V_VIEW_ID,
+    PLY_V_VIEW_ID,
     PLY_V_IGNORE_FLOAT,
     PLY_V_IGNORE_DOUBLE,
     PLY_V_IGNORE_UINT32,
-	PLY_V_IGNORE_UINT8,
+    PLY_V_IGNORE_UINT8
 };
 
 /** PLY face element properties. */

@@ -75,8 +75,8 @@ DMRecon::DMRecon(mve::Scene::Ptr _scene, Settings const& _settings)
         throw std::invalid_argument("Invalid master view");
 
     /* Prepare reconstruction */
-	refV->loadColorImage(settings.scale);
-	refV->prepareMasterView(settings.scale, settings.keepViewIndicesPerPixel, settings.nrReconNeighbors + 1);
+    refV->loadColorImage(this->settings.scale);
+    refV->prepareMasterView(settings.scale, settings.keepViewIndicesPerPixel, settings.nrReconNeighbors + 1);
     mve::ByteImage::ConstPtr scaled_img = refV->getScaledImg();
     this->width = scaled_img->width();
     this->height = scaled_img->height();
@@ -118,39 +118,38 @@ DMRecon::start()
 
         // Save images to view
         mve::View::Ptr view = refV->getMVEView();
-		std::string scale = util::string::get(settings.scale);
 
-		std::string name("depth-L");
-		name += scale;
+        std::string name("depth-L");
+        name += util::string::get(settings.scale);
         view->set_image(refV->depthImg, name);
 
         if (settings.keepDzMap)
         {
             name = "dz-L";
-			name += scale;
+            name += util::string::get(settings.scale);
             view->set_image(refV->dzImg, name);
         }
 
         if (settings.keepConfidenceMap)
         {
             name = "conf-L";
-			name += scale;
+            name += util::string::get(settings.scale);
             view->set_image(refV->confImg, name);
         }
 
         if (settings.scale != 0)
         {
             name = "undist-L";
-			name += scale;
+            name += util::string::get(settings.scale);
             view->set_image(refV->getScaledImg()->duplicate(), name);
         }
 
-		if (settings.keepViewIndicesPerPixel)
-		{
-			name = "views-L";
-			name += scale;
-			view->set_image(refV->viewIndicesImg, name);
-		}
+        if (settings.keepViewIndicesPerPixel)
+        {
+            name = "views-L";
+            name += util::string::get(settings.scale);
+            view->set_image(refV->viewIndicesImg, name);
+        }
 
         progress.status = RECON_IDLE;
 
@@ -322,8 +321,8 @@ DMRecon::processFeatures()
             refV->dzImg->at(index, 0) = patch.getDzI();
             refV->dzImg->at(index, 1) = patch.getDzJ();
             refV->confImg->at(index) = conf;
-			if (settings.keepViewIndicesPerPixel)
-				storeViewIndices(refV, index, patch);
+            if (settings.keepViewIndicesPerPixel)
+                storeViewIndices(refV, index, patch);
 
             QueueData tmpData;
             tmpData.confidence = conf;
@@ -396,12 +395,10 @@ DMRecon::processQueue()
         tmpData.dz_j = patch.getDzJ();
         math::Vec3f normal = patch.getNormal();
         tmpData.localViewIDs = patch.getLocalViewIDs();
-		if (refV->confImg->at(index) <= 0)
-		{
+        if (refV->confImg->at(index) <= 0) {
             ++progress.filled;
         }
-		if (refV->confImg->at(index) < tmpData.confidence)
-		{
+        if (refV->confImg->at(index) < tmpData.confidence) {
             refV->depthImg->at(index) = tmpData.depth;
             refV->normalImg->at(index, 0) = normal[0];
             refV->normalImg->at(index, 1) = normal[1];
@@ -409,8 +406,8 @@ DMRecon::processQueue()
             refV->dzImg->at(index, 0) = tmpData.dz_i;
             refV->dzImg->at(index, 1) = tmpData.dz_j;
             refV->confImg->at(index) = tmpData.confidence;
-			if (settings.keepViewIndicesPerPixel)
-				storeViewIndices(refV, index, patch);
+            if (settings.keepViewIndicesPerPixel)
+                storeViewIndices(refV, index, patch);
 
             // left
             tmpData.x = x - 1; tmpData.y = y;
@@ -451,14 +448,14 @@ DMRecon::processQueue()
 void
 DMRecon::storeViewIndices(const SingleView::Ptr &refV, const int &index, const PatchOptimization &patch)
 {
-	// store store reference view ID
-	refV->viewIndicesImg->at(index, 0) = getRefViewNr();
-	
-	// store other view IDs from local selection
-	IndexSet const& localViewIDs = patch.getLocalViewIDs();
-	size_t nextViewIDIndex = 1;
-	for (IndexSet::iterator it = localViewIDs.begin(); it != localViewIDs.end(); ++it)
-		refV->viewIndicesImg->at(index, nextViewIDIndex++) = *it;
+    // store store reference view ID
+    refV->viewIndicesImg->at(index, 0) = getRefViewNr();
+
+    // store other view IDs from local selection
+    IndexSet const& localViewIDs = patch.getLocalViewIDs();
+    size_t nextViewIDIndex = 1;
+    for (IndexSet::iterator it = localViewIDs.begin(); it != localViewIDs.end(); ++it)
+        refV->viewIndicesImg->at(index, nextViewIDIndex++) = *it;
 }
 
 MVS_NAMESPACE_END

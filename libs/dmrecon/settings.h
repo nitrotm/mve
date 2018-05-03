@@ -39,7 +39,6 @@ struct Settings
     int scale = 0;
     bool useColorScale = true;
     bool writePlyFile = false;
-	bool keepViewIndicesPerPixel = false;
 
     /** Features outside the AABB are ignored. */
     math::Vec3f aabbMin = math::Vec3f(-std::numeric_limits<float>::max());
@@ -50,6 +49,8 @@ struct Settings
     bool keepDzMap = false;
     bool keepConfidenceMap = false;
     bool quiet = false;
+
+    bool keepViewIndicesPerPixel = false;
 };
 
 MVS_NAMESPACE_END

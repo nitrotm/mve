@@ -637,21 +637,14 @@ import_bundle_noah_ps (AppSettings const& conf)
         else if (bundler_fmt == BUNDLE_FORMAT_PHOTOSYNTHER)
         {
             /*
-			 * Depending on the version and availability of images in original resolution,
-				try to load three file names:
-			 * New version, level 0 = original size: l0/imgyyyy.jpg
+             * Depending on the version, try to load two file names:
              * New version: forStereo_xxxx_yyyy.png
              * Old version: undistorted_xxxx_yyyy.jpg
              */
-			std::string undist_filename
-				= util::fs::join_path(undist_path, "l0/img"
-				+ util::string::get_filled(num_valid_cams, 4) + ".jpg");
-
             std::string undist_new_filename
                 = util::fs::join_path(undist_path, "forStereo_"
                 + util::string::get_filled(conf.bundle_id, 4) + "_"
                 + util::string::get_filled(num_valid_cams, 4) + ".png");
-
             std::string undist_old_filename
                 = util::fs::join_path(undist_path, "undistorted_"
                 + util::string::get_filled(conf.bundle_id, 4) + "_"
@@ -660,9 +653,7 @@ import_bundle_noah_ps (AppSettings const& conf)
             /* Try the newer file name and fall back if not existing. */
             try
             {
-				if (util::fs::file_exists(undist_filename.c_str()))
-					undist = mve::image::load_file(undist_filename);
-				else if (util::fs::file_exists(undist_new_filename.c_str()))
+                if (util::fs::file_exists(undist_new_filename.c_str()))
                     undist = mve::image::load_file(undist_new_filename);
                 else
                     undist = mve::image::load_file(undist_old_filename);
@@ -776,6 +767,9 @@ import_bundle (AppSettings const& conf)
         import_bundle_noah_ps(conf);
         return;
     }
+
+    std::cerr << "Error: No bundle found." << std::endl;
+    std::exit(EXIT_FAILURE);
 }
 
 /* ---------------------------------------------------------------- */

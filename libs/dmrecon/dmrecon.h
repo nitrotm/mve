@@ -46,10 +46,6 @@ public:
     Progress const& getProgress() const;
     Progress& getProgress();
     void start();
-	
-private:
-	
-	void storeViewIndices(const SingleView::Ptr &refV, const int &index, const PatchOptimization &patch);
 
 private:
     mve::Scene::Ptr scene;
@@ -69,6 +65,8 @@ private:
     void processFeatures();
     void processQueue();
     void refillQueueFromLowRes();
+
+    void storeViewIndices(const SingleView::Ptr &refV, const int &index, const PatchOptimization &patch);
 };
 
 /* ------------------------- Implementation ----------------------- */

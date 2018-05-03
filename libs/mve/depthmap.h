@@ -71,6 +71,8 @@ MVE_NAMESPACE_END
 MVE_NAMESPACE_BEGIN
 MVE_GEOM_NAMESPACE_BEGIN
 
+const float DD_FACTOR_DEFAULT = 5.0f;
+
 /**
  * Function that calculates the pixel footprint (pixel width)
  * in 3D coordinates for pixel (x,y) and 'depth' for a depth map
@@ -103,25 +105,29 @@ pixel_3dpos (std::size_t x, std::size_t y, float depth,
  */
 TriangleMesh::Ptr
 depthmap_triangulate (FloatImage::ConstPtr dm, math::Matrix3f const& invproj,
-    float dd_factor = 5.0f, mve::Image<unsigned int>* vids = nullptr);
+    float dd_factor = DD_FACTOR_DEFAULT, mve::Image<unsigned int>* vids = nullptr);
 
 /**
  * A helper function that triangulates the given depth map with optional
  * color image (which generates additional per-vertex colors) in local
  * image coordinates.
+ * If vertex_ids != nullptr, pixel-vertex_ID mapping is provided.
  */
 TriangleMesh::Ptr
-depthmap_triangulate (FloatImage::ConstPtr dm, ByteImage::ConstPtr ci,
-	math::Matrix3f const& invproj, IntImage::ConstPtr vi = nullptr, float dd_factor = 5.0f);
+depthmap_triangulate (FloatImage::ConstPtr dm, ByteImage::ConstPtr ci, IntImage::ConstPtr vi,
+    math::Matrix3f const& invproj, float dd_factor = DD_FACTOR_DEFAULT, 
+    mve::Image<unsigned int>* vertex_ids = nullptr);
 
 /**
  * A helper function that triangulates the given depth map with optional
  * color image (which generates additional per-vertex colors) and transforms
  * the mesh into the global coordinate system.
+ * If vertex_ids != nullptr, pixel-vertex_ID mapping is provided.
  */
 TriangleMesh::Ptr
-depthmap_triangulate (FloatImage::ConstPtr dm, ByteImage::ConstPtr ci,
-	CameraInfo const& cam, IntImage::ConstPtr vi = nullptr, float dd_factor = 5.0f);
+depthmap_triangulate (FloatImage::ConstPtr dm, ByteImage::ConstPtr ci, IntImage::ConstPtr vi,
+    CameraInfo const& cam, float dd_factor = DD_FACTOR_DEFAULT,
+    mve::Image<unsigned int>* vertex_ids = nullptr);
 
 /**
  * Algorithm to triangulate range grids.
@@ -138,7 +144,7 @@ rangegrid_triangulate (Image<unsigned int> const& grid, TriangleMesh::Ptr mesh);
  * and small regions.
  */
 void
-depthmap_mesh_confidences (TriangleMesh::Ptr mesh, int numZeroRings = 0, int numDownscaledRings = 3);
+depthmap_mesh_confidences (TriangleMesh::Ptr mesh, int iterations = 3, int numZeroRings = 0);
 
 /**
  * Algorithm that peels away triangles at the mesh bounary of a

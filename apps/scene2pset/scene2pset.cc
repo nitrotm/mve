@@ -8,6 +8,7 @@
  */
 
 #include <iostream>
+#include <fstream>
 #include <stdexcept>
 #include <algorithm>
 #include <vector>
@@ -15,18 +16,17 @@
 #include <cstring>
 #include <cerrno>
 #include <cstdlib>
-#include <fstream>
 
 #include "math/octree_tools.h"
 #include "util/system.h"
 #include "util/arguments.h"
 #include "util/tokenizer.h"
+#include "util/strings.h"
 #include "mve/depthmap.h"
 #include "mve/mesh_info.h"
 #include "mve/mesh_io.h"
 #include "mve/mesh_io_ply.h"
 #include "mve/mesh_tools.h"
-#include "util/strings.h"
 #include "mve/scene.h"
 #include "mve/view.h"
 
@@ -36,26 +36,90 @@ struct AppSettings
     std::string outmesh;
     std::string dmname = "depth-L0";
     std::string image = "undistorted";
-	std::string vmname;
     std::string mask;
-	std::string aabb;
-
+    std::string aabb;
+    std::string vmname;
+    bool with_normals = false;
+    bool with_scale = false;
+    bool with_conf = false;
+    bool poisson_normals = false;
     float min_valid_fraction = 0.0f;
-	float scale_factor = 2.5f; /* "Radius" of MVS patch (usually 5x5). */
-
-	// Set confidence values to zero (up to 'confNumZeroRings' iterations), e.g. confNumZeroRings = 1 -> border vertices are assigned a confidence value of zero
-	// and then gradually increase vertex confidence values so that a vertex with border distance confNumDownweightingRings has a confidence of 1
-	// -> confNumDownweightingRings rings are downweighted
-	std::size_t confNumZeroRings = 2;
-	std::size_t confNumDownweightingRings = 4;
-
-	bool with_conf = false;
-	bool with_normals = false;
-	bool with_scale = false;
-	bool poisson_normals = false;
-
+    float scale_factor = 2.5f; /* "Radius" of MVS patch (usually 5x5). */
     std::vector<int> ids;
+    bool output_correspondence = false;
+    std::size_t confNumZeroRings = 2;
+    std::size_t confNumDownweightingRings = 4;
 };
+
+struct CorrespondenceViewMetadata
+{
+    unsigned int view_id;
+    unsigned int width;
+    unsigned int height;
+    unsigned long first_idx;
+};
+
+struct CorrespondenceData
+{
+    std::vector<math::Vec2ui> data;
+    std::vector<CorrespondenceViewMetadata> metadata;
+};
+
+void
+append_correspondence_data_from_view(const mve::Image<unsigned int>& vertex_ids, const int view_id, CorrespondenceData* corr_data)
+{
+    const unsigned int width = vertex_ids.width();
+    CorrespondenceViewMetadata curr_view_metadata;
+    curr_view_metadata.view_id = view_id;
+    curr_view_metadata.width = width;
+    curr_view_metadata.height = vertex_ids.height();
+    curr_view_metadata.first_idx = corr_data->data.size();
+    corr_data->metadata.push_back(curr_view_metadata);
+
+    const unsigned int pixel_amount = vertex_ids.get_pixel_amount();
+    const unsigned int filled_pixel_amount = pixel_amount -
+        std::count(vertex_ids.get_data().begin(), vertex_ids.get_data().end(), MATH_MAX_UINT);
+    std::vector<math::Vec2ui> curr_view_data (filled_pixel_amount);
+    for (unsigned int i = 0; i < pixel_amount; ++i)
+        if (vertex_ids.at(i) != MATH_MAX_UINT)
+            curr_view_data[vertex_ids.at(i)] = math::Vec2ui(i%width,int(i/width));
+    corr_data->data.insert(corr_data->data.end(), curr_view_data.begin(), curr_view_data.end());
+}
+
+void
+save_correspondence_data(const CorrespondenceData& corr_data, const AppSettings& conf)
+{
+    std::string corr_data_fname = conf.outmesh + "_correspondence-data.csv";
+    std::string corr_metadata_fname = conf.outmesh + "_correspondence-metadata.csv";
+
+    std::ofstream corr_data_file(corr_data_fname);
+    std::ofstream corr_metadata_file(corr_metadata_fname);
+
+    if (!corr_data_file.good() || !corr_metadata_file.good())
+    {
+        std::cerr << "Error: Could not open correspondence file(s)." << std::endl;
+        std::exit(EXIT_FAILURE);
+    }
+
+    corr_data_file << "x, y\n";
+    for (unsigned int i = 0; i < corr_data.data.size(); ++i)
+    {
+        corr_data_file << corr_data.data[i][0] << ", " <<
+            corr_data.data[i][1] << "\n" ;
+    }
+
+    corr_metadata_file << "View_ID, Width, Height, First_Vertex_Index\n";
+    for (unsigned int i = 0; i < corr_data.metadata.size(); ++i)
+    {
+        corr_metadata_file << corr_data.metadata[i].view_id << ", " <<
+            corr_data.metadata[i].width << ", " <<
+            corr_data.metadata[i].height << ", " <<
+            corr_data.metadata[i].first_idx << "\n" ;
+    }
+
+    corr_data_file.close();
+    corr_metadata_file.close();
+}
 
 void
 poisson_scale_normals (mve::TriangleMesh::ConfidenceList const& confs,
@@ -105,28 +169,33 @@ main (int argc, char** argv)
         "Generates a pointset from the scene by projecting reconstructed "
         "depth values in the world coordinate system.");
     args.add_option('d', "depthmap", true, "Name of depth map to use [depth-L0]");
-	args.add_option('i', "image", true, "Name of color image to use [undistorted]");
-	args.add_option('c', "with-conf", false, "Write points with confidence (PLY only)");
-	args.add_option('n', "with-normals", false, "Write points with normals (PLY only)");
-	args.add_option('s', "with-scale", false, "Write points with scale values (PLY only)");
-	args.add_option('V', "viewmap", true,
-		"Name of views image to write points with view indices of views which were used to create them (PLY only) [views-L0]");
+    args.add_option('i', "image", true, "Name of color image to use [undistorted]");
+    args.add_option('n', "with-normals", false, "Write points with normals (PLY only)");
+    args.add_option('s', "with-scale", false, "Write points with scale values (PLY only)");
+    args.add_option('c', "with-conf", false, "Write points with confidence (PLY only)");
     args.add_option('m', "mask", true, "Name of mask/silhouette image to clip 3D points []");
     args.add_option('v', "views", true, "View IDs to use for reconstruction [all]");
     args.add_option('b', "bounding-box", true, "Six comma separated values used as AABB.");
     args.add_option('f', "min-fraction", true, "Minimum fraction of valid depth values [0.0]");
     args.add_option('p', "poisson-normals", false, "Scale normals according to confidence");
     args.add_option('S', "scale-factor", true, "Factor for computing scale values [2.5]");
-	args.add_option('F', "fssr", true, "FSSR output, sets -nsc and -di with scale ARG");
-	args.add_option('w', "border-conf-weighting", true, "Decrease confidences per depthmap at border. (a -> number of rings with zero confidence, b -> number of downscaled confidence rings. [a,b]=[2,4] \n"
-	"Default:[a=2,b=4] c(0)=0, c(1)=0, c(2)=1/3, c(3)=2/3, c(4)=3/3=1 == border vertices and their neighbors get zero confidence, 4 border rings are less confident.");
+    args.add_option('C', "correspondence", false,
+        "Output correspondences (in absence of -m and -b only)");
+    args.add_option('F', "fssr", true, "FSSR output, sets -nsc and -di with scale ARG");
+    args.add_option('V', "viewmap", true,
+        "Name of views image to write points with view indices of views which were used to create them (PLY only) [views-L0]");
+    // Set confidence values to zero (up to 'confNumZeroRings' iterations), e.g. confNumZeroRings = 1 -> border vertices are assigned a confidence value of zero
+    // and then gradually increase vertex confidence values so that a vertex with border distance confNumDownweightingRings has a confidence of 1
+    // -> confNumDownweightingRings rings are downweighted
+    args.add_option('w', "border-conf-weighting", true, "Decrease confidences per depthmap at border. (a -> number of rings with zero confidence, b -> number of downscaled confidence rings. [a,b]=[2,4] \n"
+        "Default:[a=2,b=4] c(0)=0, c(1)=0, c(2)=1/3, c(3)=2/3, c(4)=3/3=1 == border vertices and their neighbors get zero confidence, 4 border rings are less confident.");
+
     args.parse(argc, argv);
 
     /* Init default settings. */
     AppSettings conf;
     conf.scenedir = args.get_nth_nonopt(0);
     conf.outmesh = args.get_nth_nonopt(1);
-
     /* Scan arguments. */
     while (util::ArgResult const* arg = args.next_result())
     {
@@ -135,11 +204,10 @@ main (int argc, char** argv)
 
         switch (arg->opt->sopt)
         {
-			case 'c': conf.with_conf = true; break;
             case 'n': conf.with_normals = true; break;
-			case 's': conf.with_scale = true; break;
+            case 's': conf.with_scale = true; break;
+            case 'c': conf.with_conf = true; break;
             case 'd': conf.dmname = arg->arg; break;
-			case 'V': conf.vmname = arg->arg; break;
             case 'i': conf.image = arg->arg; break;
             case 'm': conf.mask = arg->arg; break;
             case 'v': args.get_ids_from_string(arg->arg, &conf.ids); break;
@@ -147,25 +215,26 @@ main (int argc, char** argv)
             case 'f': conf.min_valid_fraction = arg->get_arg<float>(); break;
             case 'p': conf.poisson_normals = true; break;
             case 'S': conf.scale_factor = arg->get_arg<float>(); break;
+            case 'C': conf.output_correspondence = true; break;
             case 'F':
             {
                 conf.with_conf = true;
                 conf.with_normals = true;
                 conf.with_scale = true;
-
-				int scale = arg->get_arg<int>();
-
-				std::string const scaleString = util::string::get<int>(scale);
-				conf.dmname = "depth-L" + scaleString;
-				conf.image = (0 == scale ? "undistorted" : "undist-L" + scaleString);
+                int const scale = arg->get_arg<int>();
+                conf.dmname = "depth-L" + util::string::get<int>(scale);
+                conf.image = (scale == 0)
+                    ? "undistorted"
+                    : "undist-L" + util::string::get<int>(scale);
                 break;
-			}
+            }
+            case 'V': conf.vmname = arg->arg; break;
             case 'w':
             {
                 util::Tokenizer tk;
                 tk.split(arg->get_arg<std::string>(), ',');
-				conf.confNumZeroRings = util::string::convert<std::size_t>(tk[0]);
-				conf.confNumDownweightingRings = util::string::convert<std::size_t>(tk[1]);
+                conf.confNumZeroRings = util::string::convert<std::size_t>(tk[0]);
+                conf.confNumDownweightingRings = util::string::convert<std::size_t>(tk[1]);
                 break;
             }
 
@@ -209,9 +278,13 @@ main (int argc, char** argv)
 
     /* Iterate over views and get points. */
     mve::Scene::ViewList& views(scene->get_views());
+
+    /* Prepare correspondence data */
+    CorrespondenceData corr_data;
+
 #pragma omp parallel for schedule(dynamic)
     for (std::size_t i = 0; i < views.size(); ++i)
-	{
+    {
         mve::View::Ptr view = views[i];
         if (view == nullptr)
             continue;
@@ -250,20 +323,19 @@ main (int argc, char** argv)
         if (!conf.image.empty())
             ci = view->get_byte_image(conf.image);
 
-		mve::IntImage::Ptr vi;
-		if (!conf.vmname.empty())
-		{
-			vi = view->get_int_image(conf.vmname);
-
-			if (vi == nullptr)
-			{
+        mve::IntImage::Ptr vi;
+        if (!conf.vmname.empty())
+        {
+            vi = view->get_int_image(conf.vmname);
+            if (vi == nullptr)
+            {
 #pragma omp critical(showError)
-				{
-					std::cerr << "\nError: \"" << view->get_directory() + "\" does not contain a view map (" + conf.vmname + ")" << std::endl;
-					std::exit(EXIT_FAILURE);
-				}
-			}
-		}
+                {
+                    std::cerr << "\nError: \"" << view->get_directory() + "\" does not contain a view map (" + conf.vmname + ")" << std::endl;
+                    std::exit(EXIT_FAILURE);
+                }
+            }
+        }
 
 #pragma omp critical
         std::cout << "Processing view \"" << view->get_name()
@@ -272,12 +344,15 @@ main (int argc, char** argv)
 
         /* Triangulate depth map. */
         mve::TriangleMesh::Ptr mesh;
-		mesh = mve::geom::depthmap_triangulate(dm, ci, cam, vi);
+
+        mve::Image<unsigned int> vertex_ids;
+        mesh = mve::geom::depthmap_triangulate(dm, ci, vi, cam, mve::geom::DD_FACTOR_DEFAULT, &vertex_ids);
+
         mve::TriangleMesh::VertexList const& mverts(mesh->get_vertices());
         mve::TriangleMesh::NormalList const& mnorms(mesh->get_vertex_normals());
         mve::TriangleMesh::ColorList const& mvcol(mesh->get_vertex_colors());
         mve::TriangleMesh::ConfidenceList& mconfs(mesh->get_vertex_confidences());
-		mve::TriangleMesh::VertexViewLists& mvviews(mesh->get_vertex_view_lists());
+        mve::TriangleMesh::VertexViewLists& mvviews(mesh->get_vertex_view_lists());
 
         if (conf.with_normals)
             mesh->ensure_normals();
@@ -286,7 +361,7 @@ main (int argc, char** argv)
         if (conf.with_conf)
         {
             /* Per-vertex confidence down-weighting boundaries. */
-			mve::geom::depthmap_mesh_confidences(mesh, conf.confNumZeroRings, conf.confNumDownweightingRings);
+            mve::geom::depthmap_mesh_confidences(mesh, conf.confNumZeroRings, conf.confNumDownweightingRings);
 
 #if 0
             /* Per-vertex confidence based on normal-viewdir dot product. */
@@ -332,8 +407,10 @@ main (int argc, char** argv)
                     vvalues.insert(vvalues.end(), mvscale.begin(), mvscale.end());
                 if (conf.with_conf)
                     vconfs.insert(vconfs.end(), mconfs.begin(), mconfs.end());
-				if (!conf.vmname.empty())
-					vviews.insert(vviews.end(), mvviews.begin(), mvviews.end());
+                if (conf.output_correspondence && conf.mask.empty())
+                    append_correspondence_data_from_view(vertex_ids, view->get_id(), &corr_data);
+                if (!conf.vmname.empty())
+                    vviews.insert(vviews.end(), mvviews.begin(), mvviews.end());
             }
         }
         else
@@ -355,8 +432,8 @@ main (int argc, char** argv)
                         vvalues.push_back(mvscale[i]);
                     if (conf.with_conf)
                         vconfs.push_back(mconfs[i]);
-					if (!conf.vmname.empty())
-						vviews.push_back(mvviews[i]);
+                    if (!conf.vmname.empty())
+                        vviews.push_back(mvviews[i]);
                 }
             }
         }
@@ -433,21 +510,23 @@ main (int argc, char** argv)
     if (util::string::right(conf.outmesh, 4) == ".ply")
     {
         mve::geom::SavePLYOptions opts;
-		opts.write_vertex_confidences = conf.with_conf;
         opts.write_vertex_normals = conf.with_normals;
-		opts.write_vertex_values = conf.with_scale;
-		opts.write_vertex_view_ids = !conf.vmname.empty();
-		if (!conf.vmname.empty())
-		{
-			if (vviews.size() >= 1)
-				opts.view_ids_per_vertex = vviews[0].size();
-		}
+        opts.write_vertex_values = conf.with_scale;
+        opts.write_vertex_confidences = conf.with_conf;
+        opts.write_vertex_view_ids = !conf.vmname.empty();
+        if (opts.write_vertex_view_ids)
+        {
+            if (vviews.size() >= 1)
+                opts.view_ids_per_vertex = vviews[0].size();
+        }
         mve::geom::save_ply_mesh(pset, conf.outmesh, opts);
     }
     else
     {
         mve::geom::save_mesh(pset, conf.outmesh);
     }
+    if (conf.output_correspondence && conf.aabb.empty() && conf.mask.empty())
+        save_correspondence_data(corr_data, conf);
 
     return EXIT_SUCCESS;
 }

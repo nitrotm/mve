@@ -80,11 +80,11 @@ SingleView::prepareMasterView(int scale, bool keepViewIndicesPerPixel, int nrVie
     this->dzImg = mve::FloatImage::create(scaled_width, scaled_height, 2);
     this->confImg = mve::FloatImage::create(scaled_width, scaled_height, 1);
 
-	if (keepViewIndicesPerPixel)
-	{
-		this->viewIndicesImg = mve::IntImage::create(scaled_width, scaled_height, nrViewIndicesPerPixel);
-		this->viewIndicesImg->fill(-1);	//initial value with meaning: no camera
-	}
+    if (keepViewIndicesPerPixel)
+    {
+        this->viewIndicesImg = mve::IntImage::create(scaled_width, scaled_height, nrViewIndicesPerPixel);
+        this->viewIndicesImg->fill(-1);	//initial value with meaning: no camera
+    }
 }
 
 math::Vec3f
