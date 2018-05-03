@@ -361,7 +361,7 @@ main (int argc, char** argv)
         if (conf.with_conf)
         {
             /* Per-vertex confidence down-weighting boundaries. */
-            mve::geom::depthmap_mesh_confidences(mesh, conf.confNumZeroRings, conf.confNumDownweightingRings);
+            mve::geom::depthmap_mesh_confidences(mesh, conf.confNumDownweightingRings, conf.confNumZeroRings);
 
 #if 0
             /* Per-vertex confidence based on normal-viewdir dot product. */
@@ -440,7 +440,7 @@ main (int argc, char** argv)
 
         dm.reset();
         ci.reset();
-		vi.reset();
+        vi.reset();
         view->cache_cleanup();
     }
 

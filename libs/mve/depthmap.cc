@@ -546,8 +546,9 @@ depthmap_mesh_confidences (TriangleMesh::Ptr mesh, int iterations, int numZeroRi
     }
 
     /* Iteratively expand the current region and update confidences. */
-    int startOffset = -numZeroRings + 1;
+    int startOffset = numZeroRings >= 0 ? -numZeroRings + 1 : 0;
     float rampSize = iterations + startOffset;
+	numZeroRings = numZeroRings > 0 ? numZeroRings : 0;
     for (int current = 0; current < iterations; ++current)
     {
         /* Calculate confidence for that iteration. */

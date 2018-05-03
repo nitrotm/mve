@@ -144,7 +144,7 @@ rangegrid_triangulate (Image<unsigned int> const& grid, TriangleMesh::Ptr mesh);
  * and small regions.
  */
 void
-depthmap_mesh_confidences (TriangleMesh::Ptr mesh, int iterations = 3, int numZeroRings = 0);
+depthmap_mesh_confidences (TriangleMesh::Ptr mesh, int iterations = 3, int numZeroRings = -1);
 
 /**
  * Algorithm that peels away triangles at the mesh bounary of a
