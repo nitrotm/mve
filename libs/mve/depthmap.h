@@ -115,8 +115,16 @@ depthmap_triangulate (FloatImage::ConstPtr dm, math::Matrix3f const& invproj,
  */
 TriangleMesh::Ptr
 depthmap_triangulate (FloatImage::ConstPtr dm, ByteImage::ConstPtr ci, IntImage::ConstPtr vi,
-    math::Matrix3f const& invproj, float dd_factor = DD_FACTOR_DEFAULT, 
+    math::Matrix3f const& invproj, float dd_factor = DD_FACTOR_DEFAULT,
     mve::Image<unsigned int>* vertex_ids = nullptr);
+
+inline TriangleMesh::Ptr
+depthmap_triangulate (FloatImage::ConstPtr dm, ByteImage::ConstPtr ci,
+    math::Matrix3f const& invproj, float dd_factor = DD_FACTOR_DEFAULT,
+    mve::Image<unsigned int>* vertex_ids = nullptr)
+{
+    return depthmap_triangulate(dm, ci, nullptr, invproj, dd_factor, vertex_ids);
+}
 
 /**
  * A helper function that triangulates the given depth map with optional
@@ -128,6 +136,14 @@ TriangleMesh::Ptr
 depthmap_triangulate (FloatImage::ConstPtr dm, ByteImage::ConstPtr ci, IntImage::ConstPtr vi,
     CameraInfo const& cam, float dd_factor = DD_FACTOR_DEFAULT,
     mve::Image<unsigned int>* vertex_ids = nullptr);
+
+inline TriangleMesh::Ptr
+depthmap_triangulate (FloatImage::ConstPtr dm, ByteImage::ConstPtr ci,
+    CameraInfo const& cam, float dd_factor = DD_FACTOR_DEFAULT,
+    mve::Image<unsigned int>* vertex_ids = nullptr)
+{
+    return depthmap_triangulate(dm, ci, nullptr, cam, dd_factor, vertex_ids);
+}
 
 /**
  * Algorithm to triangulate range grids.
