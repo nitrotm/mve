@@ -27,6 +27,8 @@ void
 RansacPoseP3P::estimate (Correspondences2D3D const& corresp,
     math::Matrix<double, 3, 3> const& k_matrix, Result* result) const
 {
+    // TODO: the K matrix previously had px,py == 0.0
+    // Shouldn't it be 0.5 or is the pinhole origin using a different convention here?
     if (this->opts.verbose_output)
     {
         std::cout << "RANSAC-3: Running for " << this->opts.max_iterations

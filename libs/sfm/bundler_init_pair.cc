@@ -256,9 +256,15 @@ InitialPair::compute_pose (CandidatePair const& candidate,
     /* Populate K-matrices. */
     Viewport const& view_1 = this->viewports->at(candidate.view_1_id);
     Viewport const& view_2 = this->viewports->at(candidate.view_2_id);
-    pose1->set_k_matrix(view_1.focal_length, 0.0, 0.0);
+    // TODO: the K matrix previously had px,py == 0.0
+    // Shouldn't it be 0.5 or is the pinhole origin using a different convention here?
+    pose1->set_k_matrix(view_1.focal_length,
+        view_1.principal_point[0], view_1.principal_point[1]);
     pose1->init_canonical_form();
-    pose2->set_k_matrix(view_2.focal_length, 0.0, 0.0);
+    // TODO: the K matrix previously had px,py == 0.0
+    // Shouldn't it be 0.5 or is the pinhole origin using a different convention here?
+    pose2->set_k_matrix(view_2.focal_length,
+        view_2.principal_point[0], view_2.principal_point[1]);
 
     /* Compute essential matrix from fundamental matrix (HZ (9.12)). */
     EssentialMatrix E = pose2->K.transposed() * fundamental * pose1->K;
@@ -287,6 +293,8 @@ InitialPair::angle_for_pose (CandidatePair const& candidate,
     CameraPose const& pose1, CameraPose const& pose2)
 {
     /* Compute transformation from image coordinates to viewing direction. */
+    // TODO: the K matrix previously had px,py == 0.0
+    // Shouldn't it be 0.5 or is the pinhole origin using a different convention here?
     math::Matrix3d T1 = pose1.R.transposed() * math::matrix_inverse(pose1.K);
     math::Matrix3d T2 = pose2.R.transposed() * math::matrix_inverse(pose2.K);
 

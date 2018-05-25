@@ -216,6 +216,7 @@ BundleAdjustment::compute_reprojection_errors (DenseVectorType* vector_f,
 
         double const* flen = &cam.focal_length;
         double const* dist = cam.distortion;
+        // double const* pp = cam.principal_point;
         double const* rot = cam.rotation;
         double const* trans = cam.translation;
         double const* point = p3d.pos;
@@ -232,6 +233,7 @@ BundleAdjustment::compute_reprojection_errors (DenseVectorType* vector_f,
                 this->update_camera(cam, delta_x->data() + cam_id, &new_camera);
                 flen = &new_camera.focal_length;
                 dist = new_camera.distortion;
+                // pp = new_camera.principal_point;
                 rot = new_camera.rotation;
                 trans = new_camera.translation;
                 pt_id += this->cameras->size() * this->num_cam_params;
@@ -260,6 +262,8 @@ BundleAdjustment::compute_reprojection_errors (DenseVectorType* vector_f,
         this->radial_distort(rp + 0, rp + 1, dist);
 
         /* Compute reprojection error. */
+        // TODO: implement principal point in computation below?
+        // => pp[]
         vector_f->at(i * 2 + 0) = rp[0] * (*flen) - obs.pos[0];
         vector_f->at(i * 2 + 1) = rp[1] * (*flen) - obs.pos[1];
     }
@@ -435,6 +439,8 @@ BundleAdjustment::analytic_jacobian_entries (Camera const& cam,
     double const rd_factor = 1.0 + (k[0] + k[1] * radius2) * radius2;
 
     /* Compute exact camera and point entries if intrinsics are fixed */
+    // TODO: implement principal point in computation below?
+    // => cam.principal_point[]
     if (this->opts.fixed_intrinsics)
     {
         cam_x_ptr[0] = fz * rd_factor;
@@ -465,6 +471,7 @@ BundleAdjustment::analytic_jacobian_entries (Camera const& cam,
     }
 
     /* The intrinsics are easy to compute exactly. */
+    // TODO: implement principal point derivative?
     cam_x_ptr[0] = ix * rd_factor;
     cam_x_ptr[1] = cam.focal_length * ix * radius2;
     cam_x_ptr[2] = cam.focal_length * ix * radius2 * radius2;
@@ -667,12 +674,17 @@ BundleAdjustment::update_camera (Camera const& cam,
         out->focal_length = cam.focal_length;
         out->distortion[0] = cam.distortion[0];
         out->distortion[1] = cam.distortion[1];
+        out->principal_point[0] = cam.principal_point[0];
+        out->principal_point[1] = cam.principal_point[1];
     }
     else
     {
         out->focal_length = cam.focal_length + update[0];
         out->distortion[0] = cam.distortion[0] + update[1];
         out->distortion[1] = cam.distortion[1] + update[2];
+        // TODO: implement principal point update from jacobian?
+        out->principal_point[0] = cam.principal_point[0];
+        out->principal_point[1] = cam.principal_point[1];
     }
 
     int const offset = this->opts.fixed_intrinsics ? 0 : 3;
